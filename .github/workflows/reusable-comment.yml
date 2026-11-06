@@ -1,0 +1,65 @@
+name: PR Guard Comment
+
+# Se dispara via workflow_run (no via pull_request_target) para no correr nunca
+# codigo del PR con un token privilegiado. Este job solo lee el artefacto de
+# datos que dejo el scan sin privilegios y postea el comentario.
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion != 'cancelled'
+    steps:
+      - name: Descargar reporte y comentar en el PR
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+
+            const { data: artifactList } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id,
+            });
+
+            const match = artifactList.artifacts.find(a => a.name.startsWith('pr-guard-report-'));
+            if (!match) {
+              console.log('No se encontro artefacto pr-guard-report, se omite.');
+              return;
+            }
+
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: match.id,
+              archive_format: 'zip',
+            });
+
+            fs.writeFileSync('report.zip', Buffer.from(download.data));
+            execSync('unzip -o report.zip -d report');
+
+            const reportJson = JSON.parse(fs.readFileSync('report/report.json', 'utf8'));
+            if (reportJson.skipped) {
+              console.log('Reporte marcado como skipped, no se comenta.');
+              return;
+            }
+
+            const commentBody = fs.readFileSync('report/comment.md', 'utf8');
+            const prNumber = reportJson.pr_number;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: commentBody,
+            });
