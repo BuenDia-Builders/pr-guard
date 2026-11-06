@@ -68,7 +68,24 @@ templates/pr-guard-comment.yml -> .github/workflows/pr-guard-comment.yml
 ```
 
 Nothing else to configure. Both files just `uses:` the reusable workflows in
-this repo, pinned to `@main`.
+this repo, pinned to `@v1`.
+
+### Known limitation: the comment doesn't appear on the very first PR
+
+`pr-guard-comment.yml` is triggered by `workflow_run`, and GitHub only wires
+up `workflow_run` triggers for workflow files that are already on the
+repository's **default branch**. That means:
+
+- The PR that *adds* `pr-guard-comment.yml` will never get the risk-report
+  comment on itself, even though `pr-guard-scan.yml` runs fine on it.
+- The comment starts showing up starting with the next PR, once this one has
+  been merged through your normal flow into the default branch.
+
+This is a GitHub platform limitation, not a bug in this repo, and it's the
+same for any reusable `workflow_run`-based setup. If your repo has a
+branch-promotion policy (e.g. PRs to `main` must come from `develop`), the
+comment workflow only goes live once it lands on `main` through that same
+path — there's no shortcut around it.
 
 ## How this compares to what already exists
 
