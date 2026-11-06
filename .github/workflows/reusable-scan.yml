@@ -7,8 +7,31 @@ permissions:
   contents: read
 
 jobs:
+  changed-workflows:
+    name: detect changed workflows
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    outputs:
+      files: ${{ steps.diff.outputs.files }}
+      any: ${{ steps.diff.outputs.any }}
+    steps:
+      - name: List workflow files touched by this PR
+        id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename' | grep -E '^\.github/workflows/.*\.ya?ml$' | tr '\n' ' ' || true)
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          if [ -n "$files" ]; then
+            echo "any=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "any=false" >> "$GITHUB_OUTPUT"
+          fi
+
   actionlint:
     name: actionlint
+    needs: changed-workflows
+    if: needs.changed-workflows.outputs.any == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -16,17 +39,20 @@ jobs:
         id: get_actionlint
         run: bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
         shell: bash
-      - name: Check workflow files
-        run: ${{ steps.get_actionlint.outputs.executable }} -color
+      - name: Check workflow files touched by this PR
+        run: ${{ steps.get_actionlint.outputs.executable }} -color ${{ needs.changed-workflows.outputs.files }}
         shell: bash
 
   zizmor:
     name: zizmor
+    needs: changed-workflows
+    if: needs.changed-workflows.outputs.any == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
         with:
+          inputs: ${{ needs.changed-workflows.outputs.files }}
           persona: pedantic
 
   dependency-review:
@@ -45,7 +71,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: BuenDia-Builders/pr-guard
-          ref: main
+          ref: v1
           path: .pr-guard
       - name: Compute contributor risk score
         env:
