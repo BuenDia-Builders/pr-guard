@@ -4,7 +4,7 @@ set -euo pipefail
 mkdir -p pr-guard-report
 
 if [ -z "${PR_AUTHOR:-}" ]; then
-  echo "No hay contexto de pull_request, se omite el risk score."
+  echo "No pull_request context, skipping risk score."
   echo '{"skipped": true}' > pr-guard-report/report.json
   exit 0
 fi
@@ -28,42 +28,42 @@ reasons=()
 
 if [ "$account_age_days" -lt 30 ]; then
   score=$((score + 2))
-  reasons+=("cuenta creada hace $account_age_days dias")
+  reasons+=("account created $account_age_days days ago")
 fi
 
 if [ "$fork_count" -gt 15 ] && [ "$original_count" -le 1 ]; then
   score=$((score + 3))
-  reasons+=("$fork_count forks propios vs $original_count repos originales (patron de mass-forking)")
+  reasons+=("$fork_count forked repos vs $original_count original repos (mass-forking pattern)")
 fi
 
 if [ "$prior_prs" -le 1 ]; then
   score=$((score + 1))
-  reasons+=("primera contribucion de este autor a este repo")
+  reasons+=("first contribution from this author to this repo")
 fi
 
-level="bajo"
+level="low"
 if [ "$score" -ge 3 ] && [ "$score" -lt 5 ]; then
-  level="medio"
+  level="medium"
 fi
 if [ "$score" -ge 5 ]; then
-  level="ALTO"
+  level="HIGH"
 fi
 
 {
-  echo "### pr-guard: riesgo del contribuyente"
+  echo "### pr-guard: contributor risk"
   echo ""
-  echo "**Autor:** @$PR_AUTHOR &nbsp;·&nbsp; **Riesgo:** $level (score $score)"
+  echo "**Author:** @$PR_AUTHOR &nbsp;·&nbsp; **Risk:** $level (score $score)"
   echo ""
   if [ "${#reasons[@]}" -gt 0 ]; then
-    echo "Senales detectadas:"
+    echo "Signals detected:"
     for r in "${reasons[@]}"; do
       echo "- $r"
     done
   else
-    echo "Sin senales de riesgo en el perfil del autor."
+    echo "No risk signals found on the author's profile."
   fi
   echo ""
-  echo "_Esto es una heuristica sobre el perfil del autor, no un veredicto sobre el codigo. Revisa igual el diff completo, en particular \`package.json\`, lockfiles y \`.github/workflows/\`._"
+  echo "_This is a heuristic on the author's profile, not a verdict on the code. Still review the full diff, especially \`package.json\`, lockfiles and \`.github/workflows/\`._"
 } > pr-guard-report/comment.md
 
 jq -n \
@@ -80,3 +80,4 @@ jq -n \
   > pr-guard-report/report.json
 
 echo "Risk score: $score ($level)"
+

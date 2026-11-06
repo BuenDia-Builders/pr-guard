@@ -1,8 +1,8 @@
 name: PR Guard Comment
 
-# Se dispara via workflow_run (no via pull_request_target) para no correr nunca
-# codigo del PR con un token privilegiado. Este job solo lee el artefacto de
-# datos que dejo el scan sin privilegios y postea el comentario.
+# Triggered via workflow_run (not pull_request_target) so we never run the
+# PR's code with a privileged token. This job only reads the data artifact
+# left behind by the unprivileged scan and posts the comment.
 
 on:
   workflow_call: {}
@@ -19,7 +19,7 @@ jobs:
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion != 'cancelled'
     steps:
-      - name: Descargar reporte y comentar en el PR
+      - name: Download report and comment on the PR
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
@@ -34,7 +34,7 @@ jobs:
 
             const match = artifactList.artifacts.find(a => a.name.startsWith('pr-guard-report-'));
             if (!match) {
-              console.log('No se encontro artefacto pr-guard-report, se omite.');
+              console.log('No pr-guard-report artifact found, skipping.');
               return;
             }
 
@@ -50,7 +50,7 @@ jobs:
 
             const reportJson = JSON.parse(fs.readFileSync('report/report.json', 'utf8'));
             if (reportJson.skipped) {
-              console.log('Reporte marcado como skipped, no se comenta.');
+              console.log('Report marked as skipped, no comment posted.');
               return;
             }
 
