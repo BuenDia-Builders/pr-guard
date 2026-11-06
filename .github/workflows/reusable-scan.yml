@@ -19,8 +19,10 @@ jobs:
         id: diff
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          files=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename' | grep -E '^\.github/workflows/.*\.ya?ml$' | tr '\n' ' ' || true)
+          files=$(gh api "repos/$REPO/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename' | grep -E '^\.github/workflows/.*\.ya?ml$' | tr '\n' ' ' || true)
           echo "files=$files" >> "$GITHUB_OUTPUT"
           if [ -n "$files" ]; then
             echo "any=true" >> "$GITHUB_OUTPUT"
@@ -35,12 +37,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Download actionlint
         id: get_actionlint
         run: bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
         shell: bash
       - name: Check workflow files touched by this PR
-        run: ${{ steps.get_actionlint.outputs.executable }} -color ${{ needs.changed-workflows.outputs.files }}
+        env:
+          PR_GUARD_FILES: ${{ needs.changed-workflows.outputs.files }}
+          ACTIONLINT_BIN: ${{ steps.get_actionlint.outputs.executable }}
+        run: $ACTIONLINT_BIN -color $PR_GUARD_FILES
         shell: bash
 
   zizmor:
@@ -50,6 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
         with:
           inputs: ${{ needs.changed-workflows.outputs.files }}
@@ -61,6 +70,8 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: actions/dependency-review-action@4901385134134e04cec5fbe5ddfe3b2c5bd5d976 # v4
 
   risk-score:
@@ -73,6 +84,7 @@ jobs:
           repository: BuenDia-Builders/pr-guard
           ref: v1
           path: .pr-guard
+          persist-credentials: false
       - name: Compute contributor risk score
         env:
           GH_TOKEN: ${{ github.token }}

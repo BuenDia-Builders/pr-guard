@@ -6,9 +6,8 @@ on:
     types: [completed]
 
 permissions:
-  contents: read
-  actions: read
-  pull-requests: write
+  actions: read # to list and download the scan job's report artifact
+  pull-requests: write # to post the risk report as a PR comment
 
 jobs:
   comment:

@@ -7,14 +7,17 @@ name: PR Guard Comment
 on:
   workflow_call: {}
 
-permissions:
-  contents: read
-  actions: read
-  pull-requests: write
+# No blanket permissions at the workflow level — granted narrowly on the job
+# below instead, scoped to exactly what it needs.
+permissions: {}
 
 jobs:
   comment:
+    name: comment
     runs-on: ubuntu-latest
+    permissions:
+      actions: read # to list and download the scan job's report artifact
+      pull-requests: write # to post the risk report as a PR comment
     if: >
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion != 'cancelled'
