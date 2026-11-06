@@ -45,6 +45,38 @@ flowchart TD
 | 1 | `pr-guard-scan.yml` (calls `reusable-scan.yml`) | `pull_request` | `contents: read` only | Yes, safely (no secrets to steal) | Runs `actionlint`, `zizmor`, `dependency-review-action`, and the risk-score script; writes results to an artifact |
 | 2 | `pr-guard-comment.yml` (calls `reusable-comment.yml`) | `workflow_run` (after step 1 finishes) | `pull-requests: write` | No, only reads the artifact's JSON/Markdown | Posts the risk report as a PR comment |
 
+## What this is NOT
+
+This confuses people the first time, so to be explicit:
+
+| It is not... | Because... |
+|---|---|
+| An MCP server | It's not something Claude (or any AI) calls during a conversation. There's no model involved at all — just static analysis tools and shell scripts. |
+| A Claude Code skill | You don't invoke it with `/something`. It doesn't run in a terminal session. |
+| A CLI tool you run | There's no `pr-guard scan` command. Nothing to install locally. |
+
+It's plain **GitHub Actions**: two YAML files that tell GitHub's own servers
+"when a PR opens or updates on this repo, run these jobs." Once the two
+files from `templates/` are in a repo's `.github/workflows/`, it runs itself,
+forever, with zero further action from anyone — Claude included.
+
+### How to actually see it run
+
+1. Make sure the repo has `pr-guard-scan.yml` and `pr-guard-comment.yml` in
+   `.github/workflows/` (see [Installing it on a repo](#installing-it-on-a-repo)).
+2. Open a pull request against that repo — any change works, even a one-line
+   edit made straight on github.com. It doesn't need to come from this tool
+   or from Claude; any PR, from anyone, triggers it the same way.
+3. Scroll to the **Checks** section at the bottom of the PR page on GitHub.
+   `actionlint`, `zizmor`, `dependency-review`, and `risk-score` show up
+   there and run live, the same as any other CI check you're used to seeing.
+4. If the repo already has `pr-guard-comment.yml` on its default branch (see
+   the limitation below), the risk report also shows up as a regular PR
+   comment a few seconds after the scan finishes.
+
+That's the whole test. Nothing to run, nothing to call, nothing to ask
+Claude for — it's automatic from the moment it's installed.
+
 ## What the risk score checks
 
 | Signal | Threshold | Points |
